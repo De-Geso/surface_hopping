@@ -7,11 +7,10 @@ program fpe
 use functions
 use parameters
 use string_utilities
-use linear_algebra
 implicit none
 
 ! theta = 1.0 for implicit, theta = 0.5 for Crank-Nicolson
-real, parameter :: theta = 1.
+real, parameter :: theta = 0.5
 ! transfer constant. Controls how agressively probability is transfered
 ! between potentials. Higher is more agressive. 0.<=gam<=1.
 real, parameter :: gam = 0.1
@@ -21,14 +20,14 @@ integer, parameter :: transfers = 1
 
 real, parameter :: xx_min = -2.0
 real, parameter :: xx_max = 3.0
-integer, parameter :: n = 1000
-real, parameter :: dt = 0.001
+integer, parameter :: n = 100
+real, parameter :: dt = 0.0001
 real, parameter :: dx = (xx_max-xx_min)/(n-1.0)
 integer, parameter :: check_step = int(1.0/dt)
 real, parameter :: eps = 1.e-12
 real, dimension(n) :: positions
-real, dimension(n, 2) :: prob, p_now, p_last, p_last_ref, &
-	pot_at_pos, drift, diff
+real, dimension(n, 2) :: prob, p_now, p_last, p_last_ref, pot_at_pos, &
+	drift, diff
 real z
 integer i, j
 
@@ -52,14 +51,14 @@ end do
 
 ! Calculate the equilibrium distribution
 prob = exp(-beta*pot_at_pos)/z
-!prob(:,1) = 2./(3.*n)
-!prob(:,2) = 1./(3.*n)
+! prob(:,1) = 1./(2.*n)
+! prob(:,2) = 1./(2.*n)
 
 p_now = prob
-write (*,*) sum(p_now) - 1.
-
+write (*,*) sum(p_now) - 1.0
 
 call steady_state()
+call dump()
 
 
 
@@ -87,6 +86,7 @@ end do
 end subroutine
 
 
+
 subroutine steady_state()
 real tot_var_dist
 integer continue_condition, step_counter
@@ -109,10 +109,11 @@ do while (continue_condition .eq. 1)
 	
 	if (step_counter .ge. check_step) then
 		! output the current distribution
-		call dump()
+!		call dump()
 		! check if the distribution changed from last check
 		tot_var_dist = 0.5*sum(abs(p_last_ref-p_now))
-		write (*, *) tot_var_dist, eps
+		write (*,*) tot_var_dist, eps
+		
 		! check normalization
 		if (abs(sum(p_now) - 1.) .gt. eps) then
 			write (*,*) 'Normalization Broken', sum(p_now) - 1.
@@ -140,67 +141,84 @@ end subroutine
 
 
 subroutine update_prob()
-real dl(n-1,2), d(n,2), du(n-1,2), b(n,2), a(n,2), c(n,2), u(n,2), r(n,2)
-real, dimension(n,2) :: aa, bb, cc, rr, uu
+real dl(n-1,2), d(n,2), du(n-1,2), b(n,2)
+real ll(n-1,2), dd(n,2), uu(n-1,2), bb(n,2)
 integer info(2)
-integer i, j
+integer i
 
+! Construct the tridiagonal matrix, all unknowns on the left
 do i = 1, n-1
 	du(i,:) = -theta*dt*(diff(i+1,:)/(dx*dx) - drift(i+1,:)/(2.*dx))
 	dl(i,:) = -theta*dt*(diff(i,:)/(dx*dx) + drift(i,:)/(2.*dx))
 end do
-d = 1. + theta*dt*2.*diff/(dx*dx)
+d = 1. - theta*dt*(-2.*diff/(dx*dx))
 
-! b is overwritten, and we still maybe care about p_last, so feed sgtsv
-! a dummy
+! Construct the solution b, all knowns on the right
 do i = 2, n-1
-	b(i,:) = p_last(i,:) + dt*(1.-theta)*(		&
-		-(drift(i+1,:)*p_last(i+1,:) - drift(i-1,:)*p_last(i-1,:))/(2.*dx)		&
+	b(i,:) = p_last(i,:) + dt*(1.-theta)*( &
+		-(drift(i+1,:)*p_last(i+1,:) - drift(i-1,:)*p_last(i-1,:))/(2.*dx) &
 		+(diff(i+1,:)*p_last(i+1,:)-2.*diff(i,:)*p_last(i,:)+diff(i-1,:)*p_last(i-1,:))/(dx*dx))
 end do
 
-! dirichlet boundary conditions
-b(1,:) = p_last(1,:)
-du(1,:) = 0.
-d(1,:) = 1.
-
-b(n,:) = p_last(n,:)
-d(n,:) = 1.
-dl(n-1,:) = 0.
 
 ! von Neumann boundary conditions
-b(1,:) = p_last(1,:) + (1.-theta)*dt*2.*(diff(2,:)*p_last(2,:)-diff(1,:)*p_last(1,:))/(dx*dx)
-d(1,:) = 1. + theta*dt*2.*diff(1,:)/(dx*dx)
-du(1,:) = -theta*dt*2.*diff(2,:)/(dx*dx)
+! Left
+d(1,:) = 1.0 - theta*dt*(drift(1,:)/(2.0*dx) + (-diff(1,:)-dx*drift(1,:))/(dx*dx))
+du(1,:) = -theta*dt*(-drift(2,:)/(2.0*dx) + diff(2,:)/(dx*dx))
+b(1,:) = p_last(1,:) + (1.0-theta)*dt*( &
+	-(drift(2,:)*p_last(2,:) - drift(1,:)*p_last(1,:))/(2.0*dx) &
+	+(diff(2,:)*p_last(2,:) - (diff(1,:)+dx*drift(1,:))*p_last(1,:))/(dx*dx))
+	
+! Right
+d(n,:) = 1.0 - theta*dt*(-drift(n,:)/(2.0*dx) + (-diff(n,:)+dx*drift(n,:))/(dx*dx))
+dl(n-1,:) = -theta*dt*(drift(n-1,:)/(2.0*dx) + diff(n-1,:)/(dx*dx))
+b(n,:) = p_last(n,:) + (1.0-theta)*dt*( &
+	-(drift(n,:)*p_last(n,:) - drift(n-1,:)*p_last(n-1,:))/(2.0*dx) &
+	+((-diff(n,:)+dx*drift(n,:))*p_last(n,:) + diff(n-1,:)*p_last(n-1,:))/(dx*dx))
 
-b(n,:) = p_last(n,:) + (1.-theta)*dt*2.*(diff(n-1,:)*p_last(n-1,:)-diff(n,:)*p_last(n,:))/(dx*dx)
-d(n,:) = 1. + theta*dt*2.*diff(n,:)/(dx*dx)
-dl(n-1,:) = -theta*dt*2.*diff(n,:)/(dx*dx)
-
-!! von Neumann boundary conditions 2
-!! left
-!b(1,:) = p_last(1,:) + (1.-theta)*dt*(		&
-!	(-drift(2,:)*p_last(2,:)+drift(1,:)*p_last(1,:))/(2.*dx)		&
-!	+(diff(2,:)*p_last(2,:)-2.*diff(1,:)*p_last(1,:)		&
-!		+diff(1,:)*(p_last(1,:)-drift(1,:)*dx/diff(1,:)*p_last(1,:)))/(dx*dx))
-!d(1,:) = 1. + theta*dt*2.*diff(1,:)
-!du(1,:) = -theta*dt*2.*diff(2,:)
-
-aa = 0.; aa(2:n,:) = dl
-bb = d
-cc = 0.; cc(1:n-1,:) = du
-rr = b
+! copies to feed to improve
+bb = b
+uu = du
+dd = d
+ll = dl
 
 do i = 1,2
-!	call tridag(aa(:,i), bb(:,i), cc(:,i), rr(:,i), uu(:,i), n)
 	call dgtsv(n, 1, dl(:,i), d(:,i), du(:,i), b(:,i), n, info(i))
 	if (info(i) .NE. 0) stop info(i)
+	! p_now(:,i) = improve(n, ll(:,i), dd(:,i), uu(:,i), bb(:,i), b(:,i))
 end do
-
 p_now = b
-!p_now = uu
-
 end subroutine
+
+
+
+function improve(n, dl, d, du, b, x)
+real improve(n), dl(n-1), d(n), du(n-1), b(n), x(n)
+integer n
+real r(n)
+integer i, info
+double precision sdp
+
+sdp = -b(1)
+sdp = sdp + d(1)*x(1) + du(1)*x(2)
+r(1) = sdp
+do i = 2, n-1
+	sdp = -b(i)
+	sdp = sdp + dl(i-1)*x(i-1) + d(i)*x(i) + du(i)*x(i+1)
+	r(i) = sdp
+end do
+sdp = -b(n)
+sdp = sdp + dl(n-1)*x(n-1) + d(i)*x(i)
+r(n) = sdp
+
+call dgtsv(n, 1, dl, d, du, r, n, info)
+if (info .NE. 0) stop info
+
+do i = 1, n
+	improve(i) = x(i)-r(i)
+end do
+end function
+
 
 
 
@@ -221,27 +239,23 @@ end subroutine
 function drift0(x)
 	real drift0, x
 	drift0 = -k0*x
-	drift0 = 0.
 end function
 
 
 function drift1(x)
 	real drift1, x
 	drift1 = -k1*(x-g)
-	drift1 = 0.
 end function
 
 
 subroutine dump()
-integer i, j
+integer i
 
-do j = 1, 2
-	do i = 1, n
-		write (j,*) positions(i), p_now(i,j)
-	end do
-	write (j,*) ''
-	write (j,*) ''
+do i = 1, n
+	write (10,*) positions(i), p_now(i,1), p_now(i,2)
 end do
+write (10,*) ''
+write (10,*) ''
 end subroutine
 
 end program

@@ -7,11 +7,11 @@ use linear_algebra
 implicit none
 
 ! beta = 1 is fully implicit, beta = 0.5 is Crank Nicolson
-real, parameter :: beta = 1.
-real, parameter :: L = 2.
-real, parameter :: tau = 5.
-real, parameter :: D = 10.
-integer, parameter :: n = 200
+real, parameter :: beta = 0.5
+real, parameter :: L = 1.
+real, parameter :: tau = 10.
+real, parameter :: D = 1.
+integer, parameter :: n = 100
 real, parameter :: dt = 0.001
 real, parameter :: dx = L/(n-1.)
 real, parameter :: alpha = D*dt/dx**2
@@ -37,7 +37,7 @@ norm = sum(v)
 do while (t .LE. tau)
 !	exact = erfc(x/(2.*sqrt(t)))
 !	error = abs(u-exact)/exact
-	write (*,*) 'Normalization:', sum(v)
+	write (*,*) 'Normalization:', sum(u)
 	call dump()
 	call update()
 	t = t + dt
@@ -97,7 +97,6 @@ if (info .NE. 0) stop info
 u = b
 
 call tridag (aa, bb, cc, rr, uu, n)
-call banmul (ai, n , 1, 1, n, 3, uu, rr)
 v = uu
 end subroutine
 
@@ -134,7 +133,8 @@ end subroutine
 
 function f(x)
 real f, x
-f = -0.5*x+1
+f = -x/L+1
+!f = 0.5
 end function
 
 
