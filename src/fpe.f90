@@ -10,7 +10,7 @@ use string_utilities
 implicit none
 
 ! theta = 1.0 for implicit, theta = 0.5 for Crank-Nicolson
-real, parameter :: theta = 0.5
+real, parameter :: theta = 0.0
 ! transfer constant. Controls how agressively probability is transfered
 ! between potentials. Higher is more agressive. 0.<=gam<=1.
 real, parameter :: gam = 0.1
@@ -20,11 +20,11 @@ integer, parameter :: transfers = 1
 
 real, parameter :: xx_min = -2.0
 real, parameter :: xx_max = 3.0
-integer, parameter :: n = 100
-real, parameter :: dt = 0.0001
+integer, parameter :: n = 1000
+real, parameter :: dt = 0.00001
 real, parameter :: dx = (xx_max-xx_min)/(n-1.0)
 integer, parameter :: check_step = int(1.0/dt)
-real, parameter :: eps = 1.e-12
+real, parameter :: eps = 1.e-16
 real, dimension(n) :: positions
 real, dimension(n, 2) :: prob, p_now, p_last, p_last_ref, pot_at_pos, &
 	drift, diff
@@ -148,16 +148,16 @@ integer i
 
 ! Construct the tridiagonal matrix, all unknowns on the left
 do i = 1, n-1
-	du(i,:) = -theta*dt*(diff(i+1,:)/(dx*dx) - drift(i+1,:)/(2.*dx))
-	dl(i,:) = -theta*dt*(diff(i,:)/(dx*dx) + drift(i,:)/(2.*dx))
+	du(i,:) = -theta*dt*(diff(i+1,:)/(dx*dx) - drift(i+1,:)/(2.0*dx))
+	dl(i,:) = -theta*dt*(diff(i,:)/(dx*dx) + drift(i,:)/(2.0*dx))
 end do
-d = 1. - theta*dt*(-2.*diff/(dx*dx))
+d = 1.0 - theta*dt*(-2.0*diff/(dx*dx))
 
 ! Construct the solution b, all knowns on the right
 do i = 2, n-1
-	b(i,:) = p_last(i,:) + dt*(1.-theta)*( &
-		-(drift(i+1,:)*p_last(i+1,:) - drift(i-1,:)*p_last(i-1,:))/(2.*dx) &
-		+(diff(i+1,:)*p_last(i+1,:)-2.*diff(i,:)*p_last(i,:)+diff(i-1,:)*p_last(i-1,:))/(dx*dx))
+	b(i,:) = p_last(i,:) + dt*(1.0-theta)*( &
+		-(drift(i+1,:)*p_last(i+1,:) - drift(i-1,:)*p_last(i-1,:))/(2.0*dx) &
+		+(diff(i+1,:)*p_last(i+1,:)-2.0*diff(i,:)*p_last(i,:)+diff(i-1,:)*p_last(i-1,:))/(dx*dx))
 end do
 
 

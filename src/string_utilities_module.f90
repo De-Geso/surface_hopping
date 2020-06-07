@@ -11,10 +11,26 @@ implicit none
 
 contains
 
+function filelength(filename)
+character(len=*) :: filename
+integer i, nlines, filelength
+
+nlines = 0
+open(1, file=filename)
+do
+	read(1, *, end=10)
+	nlines = nlines+1
+end do
+10 close(1)
+filelength = nlines
+end function
+
+
+
 subroutine edit_ctrl (var, num)
 ! Rewrite control_file.txt
 ! uses: read_cmd_line, trim_zeros
-character(len=25) :: buffer, label, ctrl_file, dummy
+character(len=100) :: buffer, label, ctrl_file, dummy
 character(len=*) :: var
 integer :: ios = 0, line = 0, col = 0
 real num
@@ -51,14 +67,48 @@ do while (ios == 0)
 		end if
 	end if
 end do
-close(1);	close(2)
+close(1)
+close(2)
 ios = rename('new.txt', ctrl_file)
 end subroutine
 
 
 
-subroutine make_filename()
-end subroutine
+function make_filename (path, s, lmbda) result (outs)
+! Takes a given path and name prefix and concatenates values of k, 
+! G0, lambda0, and tau if asked for to filename
+! Calls: replace_text
+! Updated: 2020-03-05
+real, optional :: lmbda
+character(*) :: path, s
+character(len=100) :: outs, str
+outs = s
+! Write in value for k0
+write (str, '(F100.5)') k0
+call trim_zeros (str)
+outs = trim (outs) // '_k0_' // trim (adjustl (str))
+! Write in value for k1
+write (str, '(F100.5)') k1
+call trim_zeros (str)
+outs = trim (outs) // '_k1_' // trim (adjustl (str))
+! Write in our value for G0
+if (G0 /= 0.0) then
+	write (str, '(F100.5)') G0
+	call trim_zeros (str)
+	outs = trim (outs) // '_G_' // trim (adjustl (str))
+end if
+! Write in our value for lambda if asked for
+if (present(lmbda)) then
+	write (str, '(F100.5)') lmbda
+	call trim_zeros (str)
+	outs = trim (outs) // '_l_' // trim (adjustl (str))
+end if
+
+! add suffix, and tell us where it's going
+outs = trim(outs)//'.dat'
+outs = trim (path)//trim (outs)
+write (*,*) 'file at: ', outs
+end function
 
 
 
@@ -103,6 +153,9 @@ do while (ios .eq. 0)
 			case ('lmbda0')
 				read (buffer, *) lmbda0
 				write (*,*) 'lmbda0 = ', lmbda0
+			case ('tau')
+				read (buffer, *) tau
+				write (*,*) 'tau = ', tau
 			case ('x_min')
 				read (buffer, *) x_min
 				write (*,*) 'x_min = ', x_min
@@ -160,5 +213,21 @@ do i = len_trim(str), 1, -1
 end do
 string = str
 end subroutine trim_zeros
+
+
+
+! Get the nth command line argument and make it nice for writing into
+! control file.
+function read_cmd_line (n) result (input)
+	integer n
+	character(len=100) :: input
+
+
+	call get_command_argument(n, input)
+	! bail out if we didn't supply an nth argument
+	if (len_trim(input) == 0) stop "input"
+	write (*,'(A, I2.0)') ' Input Number =', n
+	write (*,*) 'Input Read = ', adjustl(trim(input))
+end function
 
 end module

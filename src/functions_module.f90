@@ -12,31 +12,36 @@ implicit none
 contains
 
 !=======================================================================
-! ENERGIES
+! ENERGETICS
 !=======================================================================
+! Energies, forces, etc.
 
-function V0 (x, lmbda)
+pure function V0 (x, lmbda)
+intent (in) x, lmbda
 ! System when an electron has been transferred from metal to molecule.
 real V0, x, lmbda
 V0 = 0.5*k0*x**2+(G0+lmbda)
 end function
 
-function V1 (x)
+
+
+pure function V1 (x)
+intent (in) x
 ! System when the molecule is uncharged.
 real V1, x
 V1 = 0.5*k1*(x-g)**2
 end function
 
-function pmf (x, lmbda)
-! Potential of mean force
-real pmf, x, lmbda
-pmf = -1./beta * log(exp(-beta*V0(x, lmbda))+exp(-beta*V1(x)))
-end function
 
-function free_energy (lmbda)
-! Free energy
-real free_energy, lmbda
-free_energy = -1./beta * log(sqrt(2.*PI/beta)*(1./sqrt(k1)+exp(-beta*(G0+lmbda))/sqrt(k0)))
+
+pure function force_variance (lmbda)
+intent (in) lmbda
+! Force variance of the system. Conjugate force is trivially -1 when on
+! V0, and 0 when on V1
+real force_variance, lmbda
+real a
+a = 1.0/(1.0 + sqrt(k0/k1)*exp(beta*(lmbda+G0)))
+force_variance = a - a*a
 end function
 
 !=======================================================================
@@ -50,6 +55,8 @@ prob0 = exp(-beta*V0(x,lmbda))/		&
 	(sqrt(2.*pi/(beta*k0))*exp(-beta*(G0+lmbda)) + sqrt(2.*pi/(beta*k1)))
 end function
 
+
+
 function prob1 (x, lmbda)
 ! Probability on V1 potential
 real prob1, x, lmbda
@@ -57,11 +64,6 @@ prob1 = exp(-beta*V1(x))/		&
 	(sqrt(2.*pi/(beta*k0))*exp(-beta*(G0+lmbda)) + sqrt(2.*pi/(beta*k1)))
 end function
 
-function prob_eq (x, lmbda)
-! Probability distribution
-real prob_eq, x, lmbda
-prob_eq = exp(beta*(free_energy(lmbda)-pmf(x,lmbda)))
-end function
 
 function cum_prob_eq (x, lmbda)
 ! Cumulative probability distribution
@@ -85,19 +87,11 @@ function fermi(e)
 real fermi, e
 fermi = 1./(1.+exp(beta*e))
 end function
-!=======================================================================
-! INTEGRANDS
-!=======================================================================
 
-function int_x_prob_eq (x)
-real int_x_prob_eq, x
-int_x_prob_eq = prob_eq(x, lmbda0)
-end function
-
-function int_x_friction (x)
-real int_x_friction, x
-int_x_friction = 1./D * (dl_cum_prob_eq(x, lmbda0)**2 &
-	/prob_eq(x, lmbda0))
-end function
+!=======================================================================
+! "SINGLE VARIABLE"
+!=======================================================================
+! Multivariable stuff set as single variable stuff. i.e. we only change
+! one variable at a time. For integrands, or searching in 1 dimension.
 
 end module

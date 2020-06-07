@@ -9,6 +9,7 @@ use functions
 use parameters
 use string_utilities
 use integration
+use range_finder
 implicit none
 
 real x, xstep, xmax, xmin, sl, s, sr
@@ -24,9 +25,6 @@ do i = 1, n
 	write (10,*) x, prob_eq(x, lmbda0), prob0(x,lmbda0), prob1(x,lmbda0)
 end do
 
-call qromo(int_x_prob_eq, -1.e30, -10., sl, midinf)
-call qromo(int_x_prob_eq, 10., 1e30, sr, midinf)
-call qromo(int_x_prob_eq, -10., 10., s, midpnt)
 write (*, *) sl+s+sr
 
 
@@ -34,6 +32,8 @@ contains
 
 subroutine init()
 call read_control()
+call find_lrange()
+call find_xrange()
 end subroutine
 
 end program
