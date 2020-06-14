@@ -139,6 +139,10 @@ do while (ios .eq. 0)
 			case default
 				write (*, *) 'Skipping invalid line at line: ', line
 			case ('')
+			! Coupling
+			case ('gam')
+				read (buffer, *) gam
+				write (*,*) 'gam = ', gam
 			! Force constants
 			case ('k0')
 				read (buffer, *) k0

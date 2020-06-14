@@ -34,6 +34,15 @@ end function
 
 
 
+pure function E (x, lmbda)
+intent(in) x, lmbda
+! Energy gap between the states
+real E, x, lmbda
+E = V1(x) - V0(x, lmbda)
+end function
+
+
+
 pure function force_variance (lmbda)
 intent (in) lmbda
 ! Force variance of the system. Conjugate force is trivially -1 when on
@@ -47,6 +56,14 @@ end function
 !=======================================================================
 ! PROBABILITIES
 !=======================================================================
+
+pure function Z (lmbda)
+intent(in) lmbda
+real Z, lmbda
+! Partition function
+Z = sqrt(2.*pi/(beta*k0))*exp(-beta*(G0+lmbda)) + sqrt(2.*pi/(beta*k1))
+end function
+
 
 function prob0 (x, lmbda)
 ! Probability on V0 potential

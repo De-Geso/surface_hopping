@@ -12,6 +12,8 @@ fbuild() {
 echo 'Building test_lmbda...'
 fbuild -Ibin/ -c src/test_lmbda.f90 -o bin/test_lmbda.o
 fbuild -o bin/test_lmbda.out \
+	bin/integration.o \
+	bin/interpolation.o \
 	bin/functions.o \
 	bin/parameters.o \
 	bin/string_utilities.o \

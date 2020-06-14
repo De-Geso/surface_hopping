@@ -18,6 +18,8 @@ real, parameter :: D = 1.0
 real, parameter :: tol = 0.001
 
 ! Control file parameters
+! Hopping coefficient
+real gam
 ! Force constants
 real k0, k1
 ! Test values
