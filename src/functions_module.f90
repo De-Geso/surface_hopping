@@ -45,13 +45,15 @@ end function
 
 pure function force_variance (lmbda)
 intent (in) lmbda
-! Force variance of the system. Conjugate force is trivially -1 when on
-! V0, and 0 when on V1
 real force_variance, lmbda
+! Equilibrium average conjugate force variance of the system at a fixed
+! lambda. Conjugate force is trivially -1 when on V0, and 0 when on V1
 real a
 a = 1.0/(1.0 + sqrt(k0/k1)*exp(beta*(lmbda+G0)))
 force_variance = a - a*a
 end function
+
+
 
 !=======================================================================
 ! PROBABILITIES
