@@ -59,11 +59,11 @@ end function
 ! PROBABILITIES
 !=======================================================================
 
-pure function Z (lmbda)
+pure function partition_function (lmbda)
 intent(in) lmbda
-real Z, lmbda
+real partition_function, lmbda
 ! Partition function
-Z = sqrt(2.*pi/(beta*k0))*exp(-beta*(G0+lmbda)) + sqrt(2.*pi/(beta*k1))
+partition_function = sqrt(2.*pi/(beta*k0))*exp(-beta*(G0+lmbda)) + sqrt(2.*pi/(beta*k1))
 end function
 
 

@@ -81,10 +81,11 @@ outfile = make_filename('data/work/', 'force_variance_work')
 end subroutine
 
 
-
 !=======================================================================
 ! INTEGRANDS
 !=======================================================================
+
+
 function int_avg (lmbda)
 real int_avg, lmbda
 int_avg = force_variance(lmbda)

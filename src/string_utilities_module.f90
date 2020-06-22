@@ -74,12 +74,12 @@ end subroutine
 
 
 
-function make_filename (path, s, lmbda) result (outs)
+function make_filename (path, s, lmbda, tau, gam) result (outs)
 ! Takes a given path and name prefix and concatenates values of k, 
 ! G0, lambda0, and tau if asked for to filename
 ! Calls: replace_text
 ! Updated: 2020-03-05
-real, optional :: lmbda
+real, optional :: lmbda, tau, gam
 character(*) :: path, s
 character(len=100) :: outs, str
 outs = s
@@ -92,7 +92,7 @@ write (str, '(F100.5)') k1
 call trim_zeros (str)
 outs = trim (outs) // '_k1_' // trim (adjustl (str))
 ! Write in our value for G0
-if (G0 /= 0.0) then
+if (G0 .ne. 0.0) then
 	write (str, '(F100.5)') G0
 	call trim_zeros (str)
 	outs = trim (outs) // '_G_' // trim (adjustl (str))
@@ -103,11 +103,24 @@ if (present(lmbda)) then
 	call trim_zeros (str)
 	outs = trim (outs) // '_l_' // trim (adjustl (str))
 end if
+! Write in our value for tau if asked for
+if (present(tau)) then
+	write (str, '(F100.5)') tau
+	call trim_zeros (str)
+	outs = trim (outs) // '_t_' // trim (adjustl (str))
+end if
+! Write in our value for tau if asked for
+if (present(gam)) then
+	write (str, '(F100.5)') gam
+	call trim_zeros (str)
+	outs = trim (outs) // '_g_' // trim (adjustl (str))
+end if
 
 ! add suffix, and tell us where it's going
 outs = trim(outs)//'.dat'
 outs = trim (path)//trim (outs)
 write (*,*) 'file at: ', outs
+
 end function
 
 

@@ -17,6 +17,7 @@ fbuild -llapack -o bin/fpe.out \
 	bin/linear_algebra.o \
 	bin/functions.o \
 	bin/parameters.o \
+	bin/range_finder.o \
 	bin/string_utilities.o \
 	bin/fpe.o
 echo 'fpe built'

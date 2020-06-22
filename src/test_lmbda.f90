@@ -53,7 +53,7 @@ end subroutine
 
 function f(x)
 real f, x
-f = 1./cosh(beta*E(x, lmbda)/2.)**2 * (exp(-beta*V0(x,lmbda))+exp(-beta*V1(x)))/Z(lmbda)
+f = (beta/gam)*1./(4.*cosh(beta*E(x, lmbda)/2.)**2) * (exp(-beta*V0(x,lmbda))+exp(-beta*V1(x)))/Z(lmbda)
 end function
 
 

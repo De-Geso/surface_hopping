@@ -4,41 +4,44 @@
 ! Updated: 2020-05-13
 
 program fpe
+use interpolation
 use functions
 use parameters
+use range_finder
 use string_utilities
 implicit none
 
-! theta = 1.0 for implicit, theta = 0.5 for Crank-Nicolson
-real, parameter :: theta = 0.0
-! transfer constant. Controls how agressively probability is transfered
-! between potentials. Higher is more agressive. 0.<=gam<=1.
-real, parameter :: gam = 0.1
-! number of times to transfer probability between potentials before
-! going to the next time step
-integer, parameter :: transfers = 1
-
+! Theta = 1.0 for implicit, theta = 0.5 for Crank-Nicolson
+real, parameter :: theta = 0.5
+! Grid limits we are solving on
 real, parameter :: xx_min = -2.0
 real, parameter :: xx_max = 3.0
 integer, parameter :: n = 1000
-real, parameter :: dt = 0.00001
+real, parameter :: dt = 0.0001
 real, parameter :: dx = (xx_max-xx_min)/(n-1.0)
+real, parameter :: eps = 1.e-10
 integer, parameter :: check_step = int(1.0/dt)
-real, parameter :: eps = 1.e-16
+character(:), allocatable :: outfile, tempfile
+! Spline variables
+integer nlines
+real, dimension(:), allocatable :: x, y, y2
+! FPE grids
 real, dimension(n) :: positions
-real, dimension(n, 2) :: prob, p_now, p_last, p_last_ref, pot_at_pos, &
-	drift, diff
-real z
+real, dimension(n, 2) :: prob, p_now, p_last, p_eq, p_last_ref, &
+	pot_at_pos, drift, diff
+real z, lmbda
 integer i, j
 
-! TESTING
-real :: lmbda(n) = 0.
+
 
 call init()
+call init_optimal()
+
+if (gam*dt .gt. 1.) stop 'Hopping constant greater than 1!'
 
 ! Populate arrays
 do i = 1, n
-	pot_at_pos(i, 1) = V0(positions(i),lmbda(1))
+	pot_at_pos(i, 1) = V0(positions(i),lmbda)
 	pot_at_pos(i, 2) = V1(positions(i))
 end do
 
@@ -55,9 +58,9 @@ prob = exp(-beta*pot_at_pos)/z
 ! prob(:,2) = 1./(2.*n)
 
 p_now = prob
-write (*,*) sum(p_now) - 1.0
 
 call steady_state()
+! call evolve()
 call dump()
 
 
@@ -68,8 +71,14 @@ contains
 
 subroutine init()
 ! Initialize variables
-integer i, j
+integer i
+
 call read_control()
+call find_lrange()
+call find_xrange()
+
+lmbda = lmbda_min
+
 prob = 0.0
 p_now = 0.0
 p_last = 0.0
@@ -77,6 +86,9 @@ p_last_ref = 0.0
 pot_at_pos = 0.0
 diff = D
 z = 0.0
+
+outfile = make_filename('data/fpe/', 'fpe', tau=tau)
+tempfile = make_filename('data/fpe/', 'temp', tau=tau)
 
 do i = 1, n
 	positions(i) = xx_min + dx*(i-1.)
@@ -87,13 +99,40 @@ end subroutine
 
 
 
+subroutine init_optimal()
+! Get optimal path data and spline it
+integer i
+real yp1, ypn
+character(:), allocatable :: datafile
+
+! Find length of optimal path file
+datafile = make_filename('data/path/', 'path')
+nlines = filelength(datafile)
+allocate(x(nlines))
+allocate(y(nlines))
+allocate(y2(nlines))
+
+! Populate arrays with optimal path information
+open(1, file=datafile)
+do i = 1, nlines
+	read(1, *) x(i), y(i)
+end do
+close(1)
+
+! Spline the optimal path
+yp1 = (y(2)-y(1))/(x(2)-x(1))
+ypn = (y(n)-y(n-1))/(x(n)-x(n-1))
+call spline (x, y, nlines, yp1, ypn, y2)
+
+end subroutine
+
+
+
 subroutine steady_state()
 real tot_var_dist
 integer continue_condition, step_counter
 integer i, j
 
-
-call dump()
 tot_var_dist = 0.0
 continue_condition = 1
 step_counter = 0
@@ -101,33 +140,34 @@ step_counter = 0
 do while (continue_condition .eq. 1)
 	! Save previous distribution
 	p_last = p_now
-	! Advance probability one timestep
+	! Advance probability one timestep on a potential
 	call update_prob()
-!	do i = 1, transfers
-!		call update_transfer(lmbda(1))
-!	end do
+	! Slosh probability between potentials
+!	call update_transfer(lmbda)
 	
 	if (step_counter .ge. check_step) then
 		! output the current distribution
-!		call dump()
+		call dump()
 		! check if the distribution changed from last check
 		tot_var_dist = 0.5*sum(abs(p_last_ref-p_now))
 		write (*,*) tot_var_dist, eps
-		
 		! check normalization
 		if (abs(sum(p_now) - 1.) .gt. eps) then
 			write (*,*) 'Normalization Broken', sum(p_now) - 1.
-!			stop
+			stop
 		end if
 		! check probability is positive
 		do i = 1,n
 		do j = 1,2
-			if ((p_now(i,j) .lt. 0.) .and. (abs(p_now(i,j)) .gt. eps)) stop 'Negative Probability'
+			if ((p_now(i,j) .lt. 0.) .and. (abs(p_now(i,j)) .gt. eps)) &
+				stop 'Negative Probability'
 		end do
 		end do
-
+		! End loop if we're at equilibrium
 		if (tot_var_dist .lt. eps) then
 			continue_condition = 0
+			! Save current distribution as equilibrium
+			p_eq = p_now
 		else
 			tot_var_dist = 0.0
 			step_counter = 0
@@ -139,8 +179,41 @@ end do
 end subroutine
 
 
+subroutine evolve()
+real t
+integer nt, i, j, k
+
+nt = int(tau/dt)
+do i = 1, nt
+	! Naive straight line path
+	lmbda = lmbda_min + (lmbda_max-lmbda_min)/tau*(i*dt)
+	! Save previous distribution
+	p_last = p_now
+	! Advance probability one timestep on a potential
+	call update_prob()
+	! Slosh probability between potentials
+	call update_transfer(lmbda)
+
+	! check normalization
+	if (abs(sum(p_now) - 1.) .gt. eps) then
+		write (*,*) 'Normalization Broken', sum(p_now) - 1.
+		stop
+	end if
+	! check probability is positive
+	do j = 1,n
+	do k = 1,2
+		if ((p_now(i,j) .lt. 0.) .and. (abs(p_now(i,j)) .gt. eps)) &
+			stop 'Negative Probability'
+	end do
+	end do
+end do
+end subroutine
+
+
 
 subroutine update_prob()
+! Update probability by solving the Fokker-Planck with explicit,
+! implicit, or crank-nicholson schemes
 real dl(n-1,2), d(n,2), du(n-1,2), b(n,2)
 real ll(n-1,2), dd(n,2), uu(n-1,2), bb(n,2)
 integer info(2)
@@ -160,15 +233,13 @@ do i = 2, n-1
 		+(diff(i+1,:)*p_last(i+1,:)-2.0*diff(i,:)*p_last(i,:)+diff(i-1,:)*p_last(i-1,:))/(dx*dx))
 end do
 
-
 ! von Neumann boundary conditions
 ! Left
 d(1,:) = 1.0 - theta*dt*(drift(1,:)/(2.0*dx) + (-diff(1,:)-dx*drift(1,:))/(dx*dx))
 du(1,:) = -theta*dt*(-drift(2,:)/(2.0*dx) + diff(2,:)/(dx*dx))
 b(1,:) = p_last(1,:) + (1.0-theta)*dt*( &
 	-(drift(2,:)*p_last(2,:) - drift(1,:)*p_last(1,:))/(2.0*dx) &
-	+(diff(2,:)*p_last(2,:) - (diff(1,:)+dx*drift(1,:))*p_last(1,:))/(dx*dx))
-	
+	+(diff(2,:)*p_last(2,:) - (diff(1,:)+dx*drift(1,:))*p_last(1,:))/(dx*dx))	
 ! Right
 d(n,:) = 1.0 - theta*dt*(-drift(n,:)/(2.0*dx) + (-diff(n,:)+dx*drift(n,:))/(dx*dx))
 dl(n-1,:) = -theta*dt*(drift(n-1,:)/(2.0*dx) + diff(n-1,:)/(dx*dx))
@@ -176,7 +247,7 @@ b(n,:) = p_last(n,:) + (1.0-theta)*dt*( &
 	-(drift(n,:)*p_last(n,:) - drift(n-1,:)*p_last(n-1,:))/(2.0*dx) &
 	+((-diff(n,:)+dx*drift(n,:))*p_last(n,:) + diff(n-1,:)*p_last(n-1,:))/(dx*dx))
 
-! copies to feed to improve
+! copies to feed to improve if necessary
 bb = b
 uu = du
 dd = d
@@ -220,18 +291,16 @@ end do
 end function
 
 
-
-
-subroutine update_transfer(lmbda_now)
-real de, lmbda_now, p_at_pos
+subroutine update_transfer(lmbda)
+real de, lmbda, trans01, trans10
 integer i
 
 do i = 1, n
-	de = V1(positions(i))-V0(positions(i),lmbda_now)
-	p_at_pos = p_now(i,1) + p_now(i,2)
-	
-	p_now(i,1) = (1.-fermi(de))*p_at_pos
-	p_now(i,2) = (fermi(de))*p_at_pos
+	de = V1(positions(i))-V0(positions(i), lmbda)
+	trans01 = gam*dt*fermi(de)*p_now(i,1)
+	trans10 = gam*dt*(1.-fermi(de))*p_now(i,2)
+	p_now(i,1) = p_now(i,1)+trans10-trans01
+	p_now(i,2) = p_now(i,2)-trans10+trans01
 end do
 end subroutine
 
@@ -252,10 +321,11 @@ subroutine dump()
 integer i
 
 do i = 1, n
-	write (10,*) positions(i), p_now(i,1), p_now(i,2)
+	write (10,*) positions(i), p_now(i,1), p_now(i,2), p_eq(i,1), p_eq(i,2)
 end do
 write (10,*) ''
 write (10,*) ''
+close(10)
 end subroutine
 
 end program
