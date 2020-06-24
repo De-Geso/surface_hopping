@@ -19,7 +19,7 @@ real, parameter :: xx_max = 3.0
 integer, parameter :: n = 1000
 real, parameter :: dt = 0.0001
 real, parameter :: dx = (xx_max-xx_min)/(n-1.0)
-real, parameter :: eps = 1.e-10
+real, parameter :: eps = 1.e-8
 integer, parameter :: check_step = int(1.0/dt)
 character(:), allocatable :: outfile, tempfile
 ! Spline variables
@@ -29,15 +29,15 @@ real, dimension(:), allocatable :: x, y, y2
 real, dimension(n) :: positions
 real, dimension(n, 2) :: prob, p_now, p_last, p_eq, p_last_ref, &
 	pot_at_pos, drift, diff
-real z, lmbda
+real z, lmbda, work
 integer i, j
 
 
 
 call init()
-call init_optimal()
-
 if (gam*dt .gt. 1.) stop 'Hopping constant greater than 1!'
+lmbda = lmbda_min
+call init_optimal()
 
 ! Populate arrays
 do i = 1, n
@@ -60,8 +60,9 @@ prob = exp(-beta*pot_at_pos)/z
 p_now = prob
 
 call steady_state()
-! call evolve()
+call evolve()
 call dump()
+write (*,*) work
 
 
 
@@ -77,8 +78,6 @@ call read_control()
 call find_lrange()
 call find_xrange()
 
-lmbda = lmbda_min
-
 prob = 0.0
 p_now = 0.0
 p_last = 0.0
@@ -86,6 +85,7 @@ p_last_ref = 0.0
 pot_at_pos = 0.0
 diff = D
 z = 0.0
+work = 0.0
 
 outfile = make_filename('data/fpe/', 'fpe', tau=tau)
 tempfile = make_filename('data/fpe/', 'temp', tau=tau)
@@ -143,26 +143,16 @@ do while (continue_condition .eq. 1)
 	! Advance probability one timestep on a potential
 	call update_prob()
 	! Slosh probability between potentials
-!	call update_transfer(lmbda)
+	call update_transfer(lmbda)
 	
 	if (step_counter .ge. check_step) then
-		! output the current distribution
-		call dump()
 		! check if the distribution changed from last check
 		tot_var_dist = 0.5*sum(abs(p_last_ref-p_now))
-		write (*,*) tot_var_dist, eps
-		! check normalization
-		if (abs(sum(p_now) - 1.) .gt. eps) then
-			write (*,*) 'Normalization Broken', sum(p_now) - 1.
-			stop
-		end if
-		! check probability is positive
-		do i = 1,n
-		do j = 1,2
-			if ((p_now(i,j) .lt. 0.) .and. (abs(p_now(i,j)) .gt. eps)) &
-				stop 'Negative Probability'
-		end do
-		end do
+		write (*,*) tot_var_dist, sum(p_now) - 1.
+
+		! Check normalization
+		call check()
+
 		! End loop if we're at equilibrium
 		if (tot_var_dist .lt. eps) then
 			continue_condition = 0
@@ -180,11 +170,14 @@ end subroutine
 
 
 subroutine evolve()
-real t
-integer nt, i, j, k
+real t, lmbda_last
+integer nt, i, j
 
 nt = int(tau/dt)
+
 do i = 1, nt
+	! Save last lambda value for calculating the work
+	lmbda_last = lmbda
 	! Naive straight line path
 	lmbda = lmbda_min + (lmbda_max-lmbda_min)/tau*(i*dt)
 	! Save previous distribution
@@ -193,19 +186,15 @@ do i = 1, nt
 	call update_prob()
 	! Slosh probability between potentials
 	call update_transfer(lmbda)
+	! Calculate work
+	do j = 1, n
+		work = work + &
+			(V0(positions(j),lmbda)-V0(positions(j),lmbda_last))*p_now(j,1)
+	end do
+	! work = work-(free_energy(lmbda)-free_energy(lmbda_last))
+	write (100, *) i, work
 
-	! check normalization
-	if (abs(sum(p_now) - 1.) .gt. eps) then
-		write (*,*) 'Normalization Broken', sum(p_now) - 1.
-		stop
-	end if
-	! check probability is positive
-	do j = 1,n
-	do k = 1,2
-		if ((p_now(i,j) .lt. 0.) .and. (abs(p_now(i,j)) .gt. eps)) &
-			stop 'Negative Probability'
-	end do
-	end do
+	call check()
 end do
 end subroutine
 
@@ -291,6 +280,7 @@ end do
 end function
 
 
+
 subroutine update_transfer(lmbda)
 real de, lmbda, trans01, trans10
 integer i
@@ -301,6 +291,24 @@ do i = 1, n
 	trans10 = gam*dt*(1.-fermi(de))*p_now(i,2)
 	p_now(i,1) = p_now(i,1)+trans10-trans01
 	p_now(i,2) = p_now(i,2)-trans10+trans01
+end do
+end subroutine
+
+
+
+subroutine check()
+integer i, j
+! Check probability is normalized
+if (abs(sum(p_now) - 1.) .gt. eps) then
+	write (*,*) 'Normalization Broken', sum(p_now) - 1.
+	stop
+end if
+! Check probability is positive
+do i = 1,n
+do j = 1,2
+	if ((p_now(i,j) .lt. 0.) .and. (abs(p_now(i,j)) .gt. eps)) &
+		stop 'Negative Probability'
+end do
 end do
 end subroutine
 
@@ -320,12 +328,12 @@ end function
 subroutine dump()
 integer i
 
+open (unit=10, file=outfile)
 do i = 1, n
 	write (10,*) positions(i), p_now(i,1), p_now(i,2), p_eq(i,1), p_eq(i,2)
 end do
 write (10,*) ''
 write (10,*) ''
-close(10)
 end subroutine
 
 end program

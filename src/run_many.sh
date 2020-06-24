@@ -8,27 +8,27 @@ fbuild() {
 }
 
 # program name that we want to run
-program='test_lmbda'
+program='fpe'
 
 ./src/compile_$program.sh
 ./src/compile_edit_control.sh
 
-k0=(4.0 16.0 64.0)
-k1=(4.0 16.0 64.0)
-tau=(1.0)
+k0=(16.0)
+k1=(16.0)
+tau=(0.01 0.1 0.5 1.0 2.0 10.0 50.0 200.0)
 lmbda=(0.0)
 
-for i in ${!k0[@]}; do
-	echo "Editing control file..."
-	./bin/edit_control.out 'k0' ${k0[$i]}
+#for i in ${!k0[@]}; do
+	#echo "Editing control file..."
+	#./bin/edit_control.out 'k0' ${k0[$i]}
 
-	for j in ${!k1[@]}; do
-		echo "Editing control file..."
-		./bin/edit_control.out 'k1' ${k1[$j]}
+	#for j in ${!k1[@]}; do
+		#echo "Editing control file..."
+		#./bin/edit_control.out 'k1' ${k1[$j]}
 		
-		#for k in ${!tau[@]}; do
-			#echo "Editing control file..."
-			#./bin/edit_control.out 'tau' ${tau[$k]}
+		for k in ${!tau[@]}; do
+			echo "Editing control file..."
+			./bin/edit_control.out 'tau' ${tau[$k]}
 
             #for l in ${!lambda[@]}; do
                 #echo "Editing control file..."
@@ -37,6 +37,6 @@ for i in ${!k0[@]}; do
                 echo "Running" $program.f90 '...'
                 time ./bin/$program.out
             #done
-		#done
-	done
-done
+		done
+	#done
+#done

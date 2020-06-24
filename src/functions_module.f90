@@ -59,6 +59,14 @@ end function
 ! PROBABILITIES
 !=======================================================================
 
+pure function free_energy (lmbda)
+intent(in) lmbda
+! Helmholtz free energy of the system at a particular lambda
+real free_energy, lmbda
+free_energy = -1./beta*log(partition_function(lmbda))
+end function
+
+
 pure function partition_function (lmbda)
 intent(in) lmbda
 real partition_function, lmbda
