@@ -55,14 +55,15 @@ do while (ios == 0)
 		if (label == var) then
 			write (*,*) 'New value for: ', trim(var), num
 			write (dummy, *) num
-			call trim_zeros(dummy)		! get rid of trailing zeros
-			write (2,'(A)') trim(trim(label) // ' = ' // adjustl(dummy))
+			! get rid of trailing zeros
+			call trim_zeros(dummy)
+			write (2,'(a)') trim(trim(label) // ' = ' // adjustl(dummy))
 		! Put in blank lines
 		else if (label == '') then
 			write (2,*) ''
 		! Rewrite lines that we don't want to change
 		else
-			call trim_zeros(buffer)
+			! call trim_zeros(buffer)
 			write (2,'(A)') trim(trim(label) // ' = ' // adjustl(buffer))
 		end if
 	end if
@@ -74,12 +75,12 @@ end subroutine
 
 
 
-function make_filename (path, s, lmbda, tau, gam) result (outs)
+function make_filename (path, s, lmbda, tau, gam, dt, h) result (outs)
 ! Takes a given path and name prefix and concatenates values of k, 
 ! G0, lambda0, and tau if asked for to filename
 ! Calls: replace_text
 ! Updated: 2020-03-05
-real, optional :: lmbda, tau, gam
+real, optional :: lmbda, tau, gam, dt, h
 character(*) :: path, s
 character(len=100) :: outs, str
 outs = s
@@ -109,11 +110,22 @@ if (present(tau)) then
 	call trim_zeros (str)
 	outs = trim (outs) // '_t_' // trim (adjustl (str))
 end if
-! Write in our value for tau if asked for
+! Write in our value for gam if asked for
 if (present(gam)) then
 	write (str, '(F100.5)') gam
 	call trim_zeros (str)
 	outs = trim (outs) // '_g_' // trim (adjustl (str))
+end if
+! Write in our value for dt if asked for
+if (present(dt)) then
+	write (str, '(F100.5)') dt
+	call trim_zeros (str)
+	outs = trim (outs) // '_dt_' // trim (adjustl (str))
+end if
+if (present(h)) then
+	write (str, '(F100.5)') h
+	call trim_zeros (str)
+	outs = trim (outs) // '_h_' // trim (adjustl (str))
 end if
 
 ! add suffix, and tell us where it's going
@@ -127,7 +139,7 @@ end function
 
 subroutine read_control()
 character(*), parameter :: infile = 'control_file.txt'
-character(20) buffer, label
+character(100) buffer, label
 integer ios, line, col
 
 ios = 0
@@ -193,6 +205,9 @@ do while (ios .eq. 0)
 			case ('beta')
 				read (buffer, *) beta
 				write (*,*) 'beta = ', beta
+			case ('flag')
+				read (buffer, *) flag
+				write (*,*) 'flag = ', flag
 		end select
 	end if
 end do

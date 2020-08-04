@@ -21,7 +21,7 @@ real, parameter :: dt = 0.0001
 real, parameter :: dx = (xx_max-xx_min)/(n-1.0)
 real, parameter :: eps = 1.e-8
 integer, parameter :: check_step = int(1.0/dt)
-character(:), allocatable :: outfile, tempfile
+character(:), allocatable :: distfile, workfile
 ! Spline variables
 integer nlines
 real, dimension(:), allocatable :: x, y, y2
@@ -29,14 +29,18 @@ real, dimension(:), allocatable :: x, y, y2
 real, dimension(n) :: positions
 real, dimension(n, 2) :: prob, p_now, p_last, p_eq, p_last_ref, &
 	pot_at_pos, drift, diff
-real z, lmbda, work
+real z, lmbda, work, tr
 integer i, j
 
 
 
+! Initialize grids and read controlled parameters
 call init()
+! Stop if we have an illegal hopping probability
 if (gam*dt .gt. 1.) stop 'Hopping constant greater than 1!'
+
 lmbda = lmbda_min
+! Initialize spline stuff for optimal protocol
 call init_optimal()
 
 ! Populate arrays
@@ -59,10 +63,16 @@ prob = exp(-beta*pot_at_pos)/z
 
 p_now = prob
 
+! Let system relax to steady state
 call steady_state()
+! Run protocol
 call evolve()
-call dump()
-write (*,*) work
+! Record data
+call dump_dist()
+! Record the total work
+open (unit=20, file=workfile, position='append')
+write (20,*) tau, work
+close (20)
 
 
 
@@ -87,8 +97,17 @@ diff = D
 z = 0.0
 work = 0.0
 
-outfile = make_filename('data/fpe/', 'fpe', tau=tau)
-tempfile = make_filename('data/fpe/', 'temp', tau=tau)
+select case (flag)
+	case default
+	stop 'Illegal flag when choosing path'
+	case (1)
+		distfile = make_filename('data/distribution/', 'dist_fpe_naive', tau=tau, gam=gam)
+		workfile = make_filename('data/work/', 'work_fpe_naive', gam=gam)
+	case (2)
+		distfile = make_filename('data/distribution/', 'dist_fpe_fvar', tau=tau, gam=gam)
+		workfile = make_filename('data/work/', 'fpe_work_fvar', gam=gam)
+end select
+
 
 do i = 1, n
 	positions(i) = xx_min + dx*(i-1.)
@@ -148,7 +167,7 @@ do while (continue_condition .eq. 1)
 	if (step_counter .ge. check_step) then
 		! check if the distribution changed from last check
 		tot_var_dist = 0.5*sum(abs(p_last_ref-p_now))
-		write (*,*) tot_var_dist, sum(p_now) - 1.
+!		write (*,*) tot_var_dist, sum(p_now) - 1.
 
 		! Check normalization
 		call check()
@@ -178,8 +197,16 @@ nt = int(tau/dt)
 do i = 1, nt
 	! Save last lambda value for calculating the work
 	lmbda_last = lmbda
-	! Naive straight line path
-	lmbda = lmbda_min + (lmbda_max-lmbda_min)/tau*(i*dt)
+	select case (flag)
+		case default
+			stop 'Illegal flag when choosing path'
+		! Naive straight line path
+		case (1)
+			lmbda = lmbda_min + (lmbda_max-lmbda_min)/tau*(i*dt)
+		case (2)
+			call splint(x, y, y2, nlines, i*dt/tau, lmbda)
+			write (50,*) i*dt/tau, lmbda
+	end select
 	! Save previous distribution
 	p_last = p_now
 	! Advance probability one timestep on a potential
@@ -191,9 +218,8 @@ do i = 1, nt
 		work = work + &
 			(V0(positions(j),lmbda)-V0(positions(j),lmbda_last))*p_now(j,1)
 	end do
-	! work = work-(free_energy(lmbda)-free_energy(lmbda_last))
-	write (100, *) i, work
-
+	work = work-(free_energy(lmbda)-free_energy(lmbda_last))
+!	write (100, *) i, work
 	call check()
 end do
 end subroutine
@@ -325,10 +351,10 @@ function drift1(x)
 end function
 
 
-subroutine dump()
+subroutine dump_dist()
 integer i
 
-open (unit=10, file=outfile)
+open (unit=10, file=distfile)
 do i = 1, n
 	write (10,*) positions(i), p_now(i,1), p_now(i,2), p_eq(i,1), p_eq(i,2)
 end do

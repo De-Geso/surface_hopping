@@ -16,30 +16,41 @@ contains
 !=======================================================================
 ! Energies, forces, etc.
 
-pure function V0 (x, lmbda)
-intent (in) x, lmbda
-! System when an electron has been transferred from metal to molecule.
-real V0, x, lmbda
-V0 = 0.5*k0*x**2+(G0+lmbda)
+pure function V (alpha, x, lmbda)
+intent (in) alpha, x, lmbda
+! Potential of the system. alpha=0 for V0, alpha=1 for V1
+real V, x, lmbda
+integer alpha
+V = (0.5*k0*x**2+(G0+lmbda))*(1-alpha) &
+	+ (0.5*k1*(x-g)**2)*alpha
 end function
 
 
 
-pure function V1 (x)
-intent (in) x
-! System when the molecule is uncharged.
-real V1, x
-V1 = 0.5*k1*(x-g)**2
-end function
+!pure function V0 (x, lmbda)
+!intent (in) x, lmbda
+!! System when an electron has been transferred from metal to molecule.
+!real V0, x, lmbda
+!V0 = 0.5*k0*x**2+(G0+lmbda)
+!end function
 
 
 
-pure function E (x, lmbda)
-intent(in) x, lmbda
-! Energy gap between the states
-real E, x, lmbda
-E = V1(x) - V0(x, lmbda)
-end function
+!pure function V1 (x)
+!intent (in) x
+!! System when the molecule is uncharged.
+!real V1, x
+!V1 = 0.5*k1*(x-g)**2
+!end function
+
+
+
+!pure function E (x, lmbda)
+!intent(in) x, lmbda
+!! Energy gap between the states
+!real E, x, lmbda
+!E = V1(x) - V0(x, lmbda)
+!end function
 
 
 
@@ -75,21 +86,33 @@ partition_function = sqrt(2.*pi/(beta*k0))*exp(-beta*(G0+lmbda)) + sqrt(2.*pi/(b
 end function
 
 
-function prob0 (x, lmbda)
-! Probability on V0 potential
-real prob0, x, lmbda
-prob0 = exp(-beta*V0(x,lmbda))/		&
-	(sqrt(2.*pi/(beta*k0))*exp(-beta*(G0+lmbda)) + sqrt(2.*pi/(beta*k1)))
+
+pure function prob_eq (alpha, x, lmbda)
+intent (in) alpha, x, lmbda
+! Probability of a particular state of the system.
+real prob_eq, x, lmbda
+integer alpha
+prob_eq = exp(-beta*V(alpha,x,lmbda))/partition_function(lmbda)
 end function
 
 
 
-function prob1 (x, lmbda)
-! Probability on V1 potential
-real prob1, x, lmbda
-prob1 = exp(-beta*V1(x))/		&
-	(sqrt(2.*pi/(beta*k0))*exp(-beta*(G0+lmbda)) + sqrt(2.*pi/(beta*k1)))
-end function
+!function prob0 (x, lmbda)
+!! Probability on V0 potential
+!real prob0, x, lmbda
+!prob0 = exp(-beta*V0(x,lmbda))/		&
+!	(sqrt(2.*pi/(beta*k0))*exp(-beta*(G0+lmbda)) + sqrt(2.*pi/(beta*k1)))
+!end function
+
+
+
+
+!function prob1 (x, lmbda)
+!! Probability on V1 potential
+!real prob1, x, lmbda
+!prob1 = exp(-beta*V1(x))/		&
+!	(sqrt(2.*pi/(beta*k0))*exp(-beta*(G0+lmbda)) + sqrt(2.*pi/(beta*k1)))
+!end function
 
 
 function cum_prob_eq (x, lmbda)
@@ -100,14 +123,6 @@ cum_prob_eq = (sqrt(k1)*(erf(sqrt(beta*k0/2.)*x)+1.) &
 	/ (2.*(sqrt(k0)*exp(beta*(G0+lmbda))+sqrt(k1)))
 end function
 
-function dl_cum_prob_eq (x, lmbda)
-! Derivative of cumulative probability distribution with respect to
-! lambda.
-real dl_cum_prob_eq, x, lmbda
-dl_cum_prob_eq = -beta*sqrt(k0*k1)*exp(beta*lmbda) &
-	* (erf(sqrt(beta*k0/2.)*x)-erf(sqrt(beta*k1/2.)*(x-g))) &
-	/ (2.*(sqrt(k0)*exp(beta*lmbda)+sqrt(k1))**2)
-end function
 
 
 function fermi(e)

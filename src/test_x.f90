@@ -20,12 +20,12 @@ parameter (n=1000, xmax=g+1., xmin=-1., xstep=(xmax-xmin)/(n-1.))
 
 call init()
 
-do i = 1, n
-	x = xmin + xstep*(i-1.)
-	write (10,*) x, prob_eq(x, lmbda0), prob0(x,lmbda0), prob1(x,lmbda0)
-end do
+!do i = 1, n
+!	x = xmin + xstep*(i-1.)
+!	write (10,*) x, prob_eq(0, x, lmbda0), prob_eq(1, x, lmbda0)
+!end do
 
-write (*, *) sl+s+sr
+!write (*, *) sl+s+sr
 
 
 contains

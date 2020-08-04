@@ -9,13 +9,15 @@ implicit none
 ! Physical constants
 real, parameter :: Pi=4.D0*DATAN(1.D0)
 
-! System parameters that we don't expect to change
+! System parameters that we don't expect to change a lot
 ! Spatial offset
 real, parameter :: g = 1.0
 ! Diffusion coefficient
 real, parameter :: D = 1.0
 ! Tolerance for range finder
 real, parameter :: tol = 0.001
+! Time step for Fokker-Planck/Hopping
+real, parameter :: dt = 0.0001
 
 ! Control file parameters
 ! Hopping coefficient
@@ -32,5 +34,8 @@ real x_min, x_max, lmbda_min, lmbda_max
 real G0
 ! Thermodynamic beta
 real beta
+! Flag to choose between
+! 0 - Naive
+integer flag
 
 end module

@@ -77,7 +77,7 @@ alpha = alpha/tau
 
 ! Make filenames
 tempfile = make_filename('data/work/', 'temp')
-outfile = make_filename('data/work/', 'force_variance_work')
+outfile = make_filename('data/work/', 'approx_work_fvar')
 end subroutine
 
 
@@ -101,7 +101,7 @@ real int_naive, t, v, lmbda
 v = (lmbda_max-lmbda_min)/tau
 lmbda = lmbda_min + v*t
 int_naive = v*v*force_variance(lmbda)
-write (40,*) t/tau, lmbda
+write (40,*) lmbda, force_variance(lmbda)
 end function
 
 function int_optimal (t)
